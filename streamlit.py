@@ -1,48 +1,40 @@
 import streamlit as st
-from main import FraudJobDetector
-import pandas as pd
+import joblib
+import numpy as np
 
-# Initialize detector and load model/vectorizer
-detector = FraudJobDetector()
-model_loaded = detector.load_models(filepath="models", deploy_only=True)
+# Set up Streamlit page config
+st.set_page_config(page_title="Fake Job Detection", layout="centered")
 
-st.set_page_config(page_title="Fake Job Detector", page_icon="🕵️", layout="centered")
+# Title
 st.title("🕵️‍♂️ Fake Job Detection")
-st.markdown("Check if a job description is **fraudulent** or **real** using an AI model.")
+st.write("Check if a job description is **fraudulent or real** using an AI model.")
 
-# Check if model is available
-if not model_loaded:
-    st.error("❌ Model not loaded. Please run training first to generate XGBoost model.")
+# Try loading the model and vectorizer from the 'models/' directory
+try:
+    model = joblib.load("models/xgboost_model.pkl")
+    vectorizer = joblib.load("models/vectorizer.pkl")
+    st.success("✅ Model and vectorizer loaded successfully!")
+except FileNotFoundError:
+    st.error("❌ Model or vectorizer file not found. Please run `main.py` first to generate them.")
     st.stop()
 
-# Text input for prediction
-job_text = st.text_area("✍️ Enter job description text below:", height=300)
+# Text input
+job_description = st.text_area("✍️ Enter the job description here:")
 
+# Predict button
 if st.button("🚀 Predict"):
-    if not job_text.strip():
-        st.warning("Please enter a valid job description.")
+    if not job_description.strip():
+        st.warning("⚠️ Please enter a job description.")
     else:
-        # Create DataFrame and preprocess
-        input_df = pd.DataFrame({'text': [job_text.lower()]})
-        input_df['text'] = input_df['text'].apply(
-            lambda x: ' '.join([w for w in x.split() if w not in detector.stop_words])
-        )
+        # Vectorize and predict
+        try:
+            input_vec = vectorizer.transform([job_description])
+            prediction = model.predict(input_vec)
+            probability = model.predict_proba(input_vec)[0][1]
 
-        # Predict
-        prediction, prob = detector.predict_deployment(input_df['text'])
-
-        # Apply custom threshold: invert logic
-        fraud_prob = prob[0]
-        if fraud_prob > 0.75:
-            label = "✅ Real"
-        else:
-            label = "🚨 Fraudulent"
-
-        # Display result
-        st.subheader("🔍 Prediction Result")
-        st.markdown(f"**Result:** {label}")
-        st.markdown(f"**Probability of Fraud:** `{fraud_prob*100:.2f}%`")
-
-# Footer
-st.markdown("---")
-st.markdown("<center><small>Fraud Job Detector | XGBoost Model | Streamlit App</small></center>", unsafe_allow_html=True)
+            if prediction[0] == 1:
+                st.error(f"❌ This job is likely **Fake** with {probability*100:.2f}% probability.")
+            else:
+                st.success(f"✅ This job appears to be **Real** with {100 - probability*100:.2f}% confidence.")
+        except Exception as e:
+            st.exception(f"Error during prediction: {e}")
