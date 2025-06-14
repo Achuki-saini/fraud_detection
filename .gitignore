@@ -1,0 +1,18 @@
+# Ignore virtual environments
+fraud/
+fraud_env/
+env/
+.venv/
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore OS files
+.DS_Store
+
+
+0
